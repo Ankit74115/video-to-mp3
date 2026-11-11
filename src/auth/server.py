@@ -160,6 +160,36 @@ def login():
     return jsonify({"token": create_jwt(row["email"])}), 200
 
 
+@server.route("/register", methods=["POST"])
+def register():
+    body = request.get_json(silent=True) or {}
+    email = str(body.get("email", "")).strip().lower()
+    password = str(body.get("password", ""))
+    if not email or "@" not in email or len(email) > 255:
+        return jsonify({"error": "enter a valid email address"}), 400
+    if len(password) < 8:
+        return jsonify({"error": "password must be at least 8 characters"}), 400
+
+    try:
+        conn = db_connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO user (email, password) VALUES (%s, %s)",
+                    (email, hash_password(password)),
+                )
+        finally:
+            conn.close()
+    except pymysql.err.IntegrityError:
+        return jsonify({"error": "an account with that email already exists"}), 409
+    except Exception as exc:  # noqa: BLE001
+        log.error("database error during register: %s", exc)
+        return jsonify({"error": "internal server error"}), 500
+
+    log.info("registered user %s", email)
+    return jsonify({"token": create_jwt(email)}), 201
+
+
 @server.route("/validate", methods=["POST"])
 def validate():
     header = request.headers.get("Authorization", "")
