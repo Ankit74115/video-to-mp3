@@ -130,3 +130,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Local artifacts
+scripts/*.mp4
+scripts/*.mp3
+*.mp3
