@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+@theme {
+  /* Remove Tailwind's stock palette entirely so only brand tokens exist. */
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Pastel peach neutrals: peach page, near-white cards */
+  --color-paper: #fddcc9;
+  --color-paper-deep: #f8cdb6;
+  --color-surface: #fff8f5;
+  --color-surface-raised: #ffffff;
+  --color-line: #f1d6c6;
+  --color-line-strong: #dfb9a2;
+  --color-ink: #141210;
+  --color-ink-soft: #453828;
+  --color-ink-muted: #8a7262;
+
+  /* Primary: moss (deep muted green) */
+  --color-moss-50: #eef3f0;
+  --color-moss-100: #d9e4de;
+  --color-moss-200: #b6cbc1;
+  --color-moss-300: #8aab9d;
+  --color-moss-500: #3f6b5c;
+  --color-moss-600: #335a4d;
+  --color-moss-700: #2a4a40;
+  --color-moss-800: #213a33;
+  --color-moss-900: #182a25;
+
+  /* Accent: peach (salmon) */
+  --color-peach-50: #fff1ea;
+  --color-peach-100: #fde0d1;
+  --color-peach-300: #fac8ad;
+  --color-peach-500: #f0a07c;
+  --color-peach-600: #d9825c;
+  --color-peach-700: #b4633f;
+
+  /* Status: butter (processing), rose (failed), stone (queued) */
+  --color-butter-50: #fff6e0;
+  --color-butter-100: #fde9b7;
+  --color-butter-500: #d9a63a;
+  --color-butter-700: #8d671a;
+  --color-rose-50: #fdecec;
+  --color-rose-100: #f8cfd0;
+  --color-rose-500: #cf4b52;
+  --color-rose-700: #96303a;
+  --color-stone-100: #ece3dc;
+  --color-stone-500: #8f7f74;
+  --color-stone-700: #5f534b;
+
+  --font-display: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Menlo, Consolas, monospace;
+
+  /* Layered, colour-tinted shadows: base -> elevated -> floating */
+  --shadow-card:
+    0 1px 2px rgb(69 56 40 / 0.05), 0 4px 12px -2px rgb(69 56 40 / 0.07),
+    0 14px 32px -10px rgb(42 74 64 / 0.14);
+  --shadow-float:
+    0 2px 4px rgb(69 56 40 / 0.06), 0 12px 28px -8px rgb(69 56 40 / 0.16),
+    0 36px 72px -20px rgb(42 74 64 / 0.24);
+  --shadow-moss: 0 1px 2px rgb(24 42 37 / 0.25), 0 10px 24px -8px rgb(42 74 64 / 0.45);
+  --shadow-peach: 0 1px 2px rgb(180 99 63 / 0.25), 0 10px 24px -8px rgb(217 130 92 / 0.45);
+  --shadow-inset: inset 0 1px 2px rgb(69 56 40 / 0.06);
+
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-pulse-dot: pulse-dot 1.6s var(--ease-soft) infinite;
+  --animate-rise: rise 0.55s var(--ease-spring) both;
+  --animate-fade-in: fade-in 0.4s var(--ease-soft) both;
+  --animate-stripes: stripes 0.9s linear infinite;
+
+  @keyframes pulse-dot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.7); opacity: 0.3; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes stripes {
+    from { transform: translateX(0); }
+    to { transform: translateX(-1.5rem); }
+  }
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background-color: var(--color-paper);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-optical-sizing: auto;
+  }
+  body {
+    min-height: 100dvh;
+    line-height: 1.7;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  ::selection {
+    background-color: var(--color-moss-200);
+    color: var(--color-moss-900);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-peach-600);
+    outline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Layered radial gradients for the page backdrop */
+@utility scene {
+  background-color: var(--color-paper);
+  background-image:
+    radial-gradient(70rem 36rem at 8% -12%, rgb(250 200 173 / 0.95), transparent 62%),
+    radial-gradient(56rem 32rem at 102% -4%, rgb(255 248 245 / 0.9), transparent 60%),
+    radial-gradient(60rem 36rem at 50% 112%, rgb(248 205 182 / 1), transparent 60%);
+}
+
+/* SVG fractal-noise grain; pair with low opacity + mix-blend-multiply */
+@utility grain {
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+/* Diagonal stripe texture for the in-flight progress bar (animated via transform only) */
+@utility stripes-moss {
+  background-image: repeating-linear-gradient(
+    -55deg,
+    rgb(255 255 255 / 0.22) 0 0.5rem,
+    transparent 0.5rem 1rem
+  );
+}
