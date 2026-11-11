@@ -148,6 +148,12 @@ def upload():
     if not f.filename:
         return jsonify({"error": "file has no name"}), 400
 
+    rejected = util.check_media(f)
+    if rejected:
+        body, status = rejected
+        log.info("rejected upload %r from %s: %s", f.filename, claims["username"], body)
+        return jsonify({"error": body}), status
+
     result, err = util.upload(f, fs_videos, jobs, claims["username"])
     if err:
         body, status = err

@@ -25,6 +25,60 @@ def ensure_queues():
     log.info("Declared queues %s and %s", VIDEO_QUEUE, MP3_QUEUE)
 
 
+SNIFF_BYTES = 512
+
+
+def _looks_like_text(head):
+    return bool(head) and all(32 <= b < 127 or b in (9, 10, 13) for b in head)
+
+
+# Container / codec signatures ffmpeg can read, written as hex so they stay readable.
+MKV_WEBM = bytes.fromhex("1a45dfa3")
+FLV = b"FLV" + bytes.fromhex("01")
+ASF_WMV = bytes.fromhex("3026b275")
+MPEG_PS = (bytes.fromhex("000001ba"), bytes.fromhex("000001b3"))
+MP3_FRAME = (bytes.fromhex("fffb"), bytes.fromhex("fff3"), bytes.fromhex("fff2"))
+
+
+def _is_known_media(head):
+    """True when the first bytes carry a container signature ffmpeg can read."""
+    if len(head) < 12:
+        return False
+    return (
+        head[4:8] == b"ftyp"  # mp4, mov, m4v, 3gp
+        or head[:4] == MKV_WEBM
+        or (head[:4] == b"RIFF" and head[8:12] in (b"AVI ", b"WAVE"))
+        or head[:4] == FLV
+        or head[:4] == b"OggS"
+        or head[:4] == ASF_WMV
+        or head[:4] in MPEG_PS
+        or (head[0] == 0x47 and len(head) > 188 and head[188] == 0x47)  # mpeg-ts
+        or head[:3] == b"ID3"
+        or head[:2] in MP3_FRAME
+        or head[:4] == b"fLaC"
+    )
+
+
+def check_media(f):
+    """Reject empty files and things that are obviously not media. Returns None or (error_text, status)."""
+    head = f.stream.read(SNIFF_BYTES)
+    f.stream.seek(0)
+    if not head:
+        return "the file is empty", 400
+    if _is_known_media(head):
+        return None
+    lowered = head.lstrip().lower()
+    if lowered.startswith((b"<!doctype", b"<html", b"<?xml", b"<head", b"<body")):
+        return (
+            "that file is a web page, not a video; download the actual video "
+            "file and try again"
+        ), 415
+    if _looks_like_text(head):
+        return "that file is plain text, not a video", 415
+    # Unknown signature but binary: let ffmpeg decide.
+    return None
+
+
 def upload(f, fs, jobs, username):
     """Returns (result_dict, None) or (None, (error_text, status))."""
     try:

@@ -42,7 +42,7 @@ All responses are JSON. Authenticated routes need `Authorization: Bearer <token>
 | `GET` | `/health` | Liveness, checks MongoDB. |
 | `POST` | `/login` | HTTP Basic credentials, returns `{"token": "..."}`. |
 | `POST` | `/register` | JSON `{"email", "password"}` (8+ chars). Creates the account and returns `{"token": "..."}`; `409` if the email exists. |
-| `POST` | `/upload` | Multipart field `file`. Returns `{"job_id", "video_fid", "filename", "status"}`. |
+| `POST` | `/upload` | Multipart field `file`. Returns `{"job_id", "video_fid", "filename", "status"}`. `400` if empty, `413` if over `MAX_UPLOAD_MB`, `415` if the content is a web page or plain text rather than media. |
 | `GET` | `/jobs` | The caller's jobs, newest first. Status is `queued`, `processing`, `done` or `failed`. |
 | `GET` | `/jobs/<id>` | One job. |
 | `GET` | `/download?fid=<mp3_fid>` | The MP3 as an attachment. Only the owner can download. |
