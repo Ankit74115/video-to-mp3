@@ -84,6 +84,8 @@ def start(message, fs_videos, fs_mp3s, jobs, channel, mp3_queue):
         if proc.returncode != 0 or not os.path.exists(mp3_path):
             detail = (proc.stderr or "").strip().splitlines()
             reason = detail[-1] if detail else "ffmpeg failed"
+            # Show the user's filename rather than our temp path.
+            reason = reason.replace(video_path, message.get("filename") or "input")
             _set_status(jobs, job_id, "failed", error=f"conversion failed: {reason[:200]}")
             return f"ffmpeg exited {proc.returncode}: {reason}"
 
