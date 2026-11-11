@@ -6,21 +6,42 @@ Built to practise microservice patterns: an API gateway, a dedicated auth
 service, asynchronous work over RabbitMQ, object storage in MongoDB GridFS,
 and a React frontend, all containerised and deployable to Kubernetes.
 
-```
- browser ──► frontend (nginx, React) ──/api──► gateway (Flask)
-                                                 │   │
-                                     login/validate   upload / jobs / download
-                                                 │   │
-                                              auth ──► MySQL (bcrypt users, JWT)
-                                                     │
-                                                     ├──► MongoDB GridFS (videos, mp3s) + jobs collection
-                                                     │
-                                                     └──► RabbitMQ  "video" queue
-                                                               │
-                                                          converter (ffmpeg) ──► GridFS mp3 ──► "mp3" queue
-                                                                                                   │
-                                                                                            notification ──► SMTP email
-```
+## Architecture
+
+### System overview
+
+![System overview](docs/diagrams/system-overview.png)
+
+The browser only ever talks to nginx. It serves the React build and proxies `/api/*` to the
+gateway, which is the single public API. The gateway hands credentials to the auth service,
+keeps uploads and results in MongoDB GridFS, records every conversion in a `jobs` collection
+and publishes work to RabbitMQ. Two workers consume from the queues: the converter runs
+ffmpeg, the notification worker emails a download link.
+
+### Conversion flow
+
+![Conversion flow](docs/diagrams/conversion-flow.png)
+
+The upload request returns as soon as the video is stored and the job is queued, so the user
+never waits on ffmpeg. The page polls `/jobs` every few seconds and flips the row from queued
+to processing to done. The converter takes one message at a time; a message is only
+acknowledged after the mp3 is stored and the job updated, so a crash mid-conversion requeues
+the work instead of losing it.
+
+### Job lifecycle
+
+![Job lifecycle](docs/diagrams/job-lifecycle.png)
+
+### Deployment
+
+![Deployment](docs/diagrams/deployment.png)
+
+Locally the whole stack runs under one `docker compose` project. The public demo targets a
+single-node k3s cluster on an Oracle Cloud Always Free ARM VM, with images built for arm64
+and amd64 by GitHub Actions. See [Deploying](#deploying).
+
+The diagrams are Excalidraw files in [`docs/diagrams/`](docs/diagrams/); open any
+`.excalidraw` file at [excalidraw.com](https://excalidraw.com) to edit it.
 
 ## Services
 
