@@ -1,0 +1,168 @@
+# Local / single-host production stack for Trackbay (video to MP3 converter).
+#
+#   cp .env.example .env     # then edit secrets
+#   docker compose up --build -d
+#   open http://localhost:3000
+#
+# Kubernetes manifests for the cluster deployment live under src/*/manifests.
+
+name: trackbay
+
+x-common-env: &common-env
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/%2F
+  VIDEO_QUEUE: ${VIDEO_QUEUE:-video}
+  MP3_QUEUE: ${MP3_QUEUE:-mp3}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+x-mongo-env: &mongo-env
+  MONGO_URI: mongodb://mongodb:27017
+  MONGO_DB: ${MONGO_DB:-mp3converter}
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  # ---------------- infrastructure ----------------
+  mongodb:
+    image: mongo:7.0
+    <<: *restart
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mysql:
+    image: mysql:8.4
+    <<: *restart
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DB:-auth}
+      MYSQL_USER: ${MYSQL_USER:-auth_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    <<: *restart
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "${RABBITMQ_UI_PORT:-15672}:15672"   # management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # ---------------- application ----------------
+  auth:
+    build: ./src/auth
+    image: ${IMAGE_PREFIX:-trackbay}/auth:${IMAGE_TAG:-local}
+    <<: *restart
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: ${MYSQL_USER:-auth_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DB: ${MYSQL_DB:-auth}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_EXP_HOURS: ${JWT_EXP_HOURS:-24}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  gateway:
+    build: ./src/gateway
+    image: ${IMAGE_PREFIX:-trackbay}/gateway:${IMAGE_TAG:-local}
+    <<: *restart
+    environment:
+      <<: [*common-env, *mongo-env]
+      AUTH_SVC_ADDRESS: auth:5000
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-100}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"   # direct API access (frontend dev proxy, curl)
+    depends_on:
+      auth:
+        condition: service_started
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  converter:
+    build: ./src/converter
+    image: ${IMAGE_PREFIX:-trackbay}/converter:${IMAGE_TAG:-local}
+    <<: *restart
+    environment:
+      <<: [*common-env, *mongo-env]
+      MP3_BITRATE: ${MP3_BITRATE:-192k}
+      FFMPEG_TIMEOUT_SECONDS: ${FFMPEG_TIMEOUT_SECONDS:-900}
+      DELETE_SOURCE_VIDEO: ${DELETE_SOURCE_VIDEO:-false}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      replicas: ${CONVERTER_REPLICAS:-1}
+
+  notification:
+    build: ./src/notification
+    image: ${IMAGE_PREFIX:-trackbay}/notification:${IMAGE_TAG:-local}
+    <<: *restart
+    environment:
+      <<: *common-env
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    image: ${IMAGE_PREFIX:-trackbay}/frontend:${IMAGE_TAG:-local}
+    <<: *restart
+    environment:
+      GATEWAY_UPSTREAM: gateway:8080
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      gateway:
+        condition: service_started
+
+volumes:
+  mongo-data:
+  mysql-data:
+  rabbitmq-data:
