@@ -36,9 +36,10 @@ the work instead of losing it.
 
 ![Deployment](docs/diagrams/deployment.png)
 
-Locally the whole stack runs under one `docker compose` project. The public demo targets a
-single-node k3s cluster on an Oracle Cloud Always Free ARM VM, with images built for arm64
-and amd64 by GitHub Actions. See [Deploying](#deploying).
+For development the whole stack runs under one `docker compose` project. The same services
+also run on Kubernetes from `deploy/k8s`: today on a k3d cluster on a laptop behind a
+Cloudflare tunnel, and unchanged on a k3s VM such as the Oracle Always Free target pictured
+above. See [Deploying](#deploying).
 
 The diagrams are Excalidraw files in [`docs/diagrams/`](docs/diagrams/); open any
 `.excalidraw` file at [excalidraw.com](https://excalidraw.com) to edit it.
@@ -132,10 +133,60 @@ must be at least 16 characters.
 
 ## Deploying
 
-Kubernetes manifests live under `src/*/manifests`. The target for the public
-demo is a single-node k3s cluster on an Oracle Cloud Always Free ARM VM, with
-Traefik ingress, cert-manager for TLS and images built for arm64 by GitHub
-Actions. See the deployment notes once that work lands.
+The Kubernetes manifests live in [`deploy/k8s`](deploy/k8s) and are applied with kustomize:
+
+- **StatefulSets** with persistent volumes for MongoDB, MySQL and RabbitMQ.
+- **Deployments** for the five services, each with startup, readiness and liveness probes and resource limits.
+- **One Traefik Ingress** in front of the frontend; nginx inside the frontend pod proxies `/api` to the gateway Service.
+- **No secrets in git.** The `trackbay-secrets` Secret is created from your `.env` at deploy time, and each pod only receives the keys it uses.
+
+### On a laptop, with a public link (k3d + Cloudflare Tunnel)
+
+This runs the real Kubernetes setup on k3s inside Docker and publishes it on an HTTPS
+`trycloudflare.com` address. No cloud account is needed; the laptop just has to stay awake.
+
+Requirements: Docker Desktop, kubectl and k3d (`winget install -e --id k3d.k3d`). The tunnel
+script downloads `cloudflared` on first use and checks its Cloudflare signature.
+
+```powershell
+# build the images, create the cluster, deploy, wait for every pod (re-run after code changes)
+powershell -ExecutionPolicy Bypass -File deploy\local\up.ps1
+
+# public HTTPS link; keep the window open, Ctrl+C stops it
+powershell -ExecutionPolicy Bypass -File deploy\local\tunnel.ps1
+
+# stop the cluster but keep its data, or delete it entirely
+powershell -ExecutionPolicy Bypass -File deploy\local\down.ps1
+powershell -ExecutionPolicy Bypass -File deploy\local\down.ps1 -Delete
+```
+
+| What | Where |
+|---|---|
+| App on Kubernetes | http://localhost:8088 |
+| Public link | Printed by `tunnel.ps1`; a new address each time the tunnel starts |
+| RabbitMQ management | `kubectl -n trackbay port-forward svc/rabbitmq 15672`, then http://localhost:15672 |
+
+Handy during a demo:
+
+```bash
+kubectl -n trackbay get pods
+kubectl -n trackbay logs -f deploy/converter
+kubectl -n trackbay scale deploy/converter --replicas=3    # convert several videos in parallel
+```
+
+Quick tunnels are meant for demos: there is no uptime guarantee and Cloudflare caps a single
+upload at about 100 MB. Start the tunnel shortly before you share the link.
+
+### On a VM
+
+The same manifests run on any single k3s node, for example an Oracle Cloud Always Free ARM VM:
+
+1. Install k3s: `curl -sfL https://get.k3s.io | sh -`
+2. Push the five images to a registry and point the `images:` block in `deploy/k8s/kustomization.yaml` at it.
+3. Create the Secret from a file holding `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, `JWT_SECRET`,
+   `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `RABBITMQ_URL` and optionally the `DEMO_USER_*` and `SMTP_*` keys:
+   `kubectl create namespace trackbay && kubectl -n trackbay create secret generic trackbay-secrets --from-env-file=secrets.env`
+4. Apply: `kubectl apply -f deploy/k3s/traefik-config.yaml && kubectl apply -k deploy/k8s`
 
 ## Design notes
 

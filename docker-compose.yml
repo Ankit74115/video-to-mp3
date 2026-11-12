@@ -4,7 +4,7 @@
 #   docker compose up --build -d
 #   open http://localhost:3000
 #
-# Kubernetes manifests for the cluster deployment live under src/*/manifests.
+# Kubernetes manifests live under deploy/k8s; see "Deploying" in the README.
 
 name: trackbay
 
