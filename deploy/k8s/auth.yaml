@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+spec:
+  selector:
+    app: auth
+  ports:
+    - name: http
+      port: 5000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: auth
+          image: trackbay/auth
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: trackbay-config
+          env:
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trackbay-secrets
+                  key: MYSQL_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: trackbay-secrets
+                  key: JWT_SECRET
+            - name: DEMO_USER_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: trackbay-secrets
+                  key: DEMO_USER_EMAIL
+                  optional: true
+            - name: DEMO_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trackbay-secrets
+                  key: DEMO_USER_PASSWORD
+                  optional: true
+          ports:
+            - name: http
+              containerPort: 5000
+          # gunicorn only binds once MySQL is reachable, so give startup plenty of room.
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 384Mi

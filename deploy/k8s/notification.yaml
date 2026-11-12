@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification
+  template:
+    metadata:
+      labels:
+        app: notification
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: notification
+          image: trackbay/notification
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: trackbay-config
+          env:
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: trackbay-secrets
+                  key: RABBITMQ_URL
+            # Email is optional: without these the worker logs and acknowledges.
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: trackbay-secrets
+                  key: SMTP_USER
+                  optional: true
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trackbay-secrets
+                  key: SMTP_PASSWORD
+                  optional: true
+            - name: SMTP_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: trackbay-secrets
+                  key: SMTP_FROM
+                  optional: true
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 128Mi

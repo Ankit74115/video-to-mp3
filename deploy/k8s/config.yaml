@@ -1,0 +1,36 @@
+# Non-secret settings shared by every service. Secrets live in "trackbay-secrets".
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trackbay-config
+data:
+  LOG_LEVEL: INFO
+  # Services wait for their dependencies on startup; 90 x 2 s covers a cold MySQL init.
+  STARTUP_RETRIES: "90"
+  STARTUP_RETRY_SECONDS: "2"
+
+  VIDEO_QUEUE: video
+  MP3_QUEUE: mp3
+
+  MONGO_URI: mongodb://mongodb:27017
+  MONGO_DB: mp3converter
+
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+  MYSQL_DB: auth
+  MYSQL_USER: auth_user
+
+  JWT_EXP_HOURS: "24"
+  AUTH_SVC_ADDRESS: auth:5000
+  MAX_UPLOAD_MB: "100"
+
+  MP3_BITRATE: 192k
+  FFMPEG_TIMEOUT_SECONDS: "900"
+  DELETE_SOURCE_VIDEO: "false"
+
+  SMTP_HOST: smtp.gmail.com
+  SMTP_PORT: "587"
+  # Link used in notification emails; deploy/local/tunnel.ps1 points it at the public URL.
+  APP_URL: http://localhost:8088
+
+  GATEWAY_UPSTREAM: gateway:8080

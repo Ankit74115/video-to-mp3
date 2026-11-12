@@ -1,0 +1,14 @@
+# k3s ships Traefik; this raises its request timeouts so large uploads over a slow
+# connection are not cut off at Traefik's 60 s default. Applied to kube-system.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    additionalArguments:
+      - "--entryPoints.web.transport.respondingTimeouts.readTimeout=600s"
+      - "--entryPoints.web.transport.respondingTimeouts.writeTimeout=600s"
+      - "--entryPoints.websecure.transport.respondingTimeouts.readTimeout=600s"
+      - "--entryPoints.websecure.transport.respondingTimeouts.writeTimeout=600s"

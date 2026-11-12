@@ -1,0 +1,42 @@
+# Trackbay on Kubernetes (k3s / k3d).
+#
+# The Secret "trackbay-secrets" is not in this directory on purpose: it is created
+# from your local .env by deploy/local/up.ps1 (or by hand, see README "Deploying").
+#
+#   kubectl apply -k deploy/k8s
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trackbay
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: trackbay
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - config.yaml
+  - mongodb.yaml
+  - mysql.yaml
+  - rabbitmq.yaml
+  - auth.yaml
+  - gateway.yaml
+  - converter.yaml
+  - notification.yaml
+  - frontend.yaml
+  - ingress.yaml
+
+# Local images are built by docker compose and imported into the cluster.
+# A registry-backed deployment overrides these with `kustomize edit set image`.
+images:
+  - name: trackbay/auth
+    newTag: local
+  - name: trackbay/gateway
+    newTag: local
+  - name: trackbay/converter
+    newTag: local
+  - name: trackbay/notification
+    newTag: local
+  - name: trackbay/frontend
+    newTag: local
